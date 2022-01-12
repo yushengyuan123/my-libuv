@@ -17,14 +17,18 @@ int uv_run(uv_loop_t *loop, uv_run_mode mode) {
     r = uv__loop_alive(loop);
 
     if (!r) {
-        uv__update_time(loop)
+        uv__update_time(loop);
     }
+
+    printf("%ld\n", loop->time);
 
     int count = 0;
 
     while (r != 0 && count < 3) {
-        printf("操你\n");
+        uv__update_time(loop);
+        printf("nihao%ld\n", loop->time);
         count++;
     }
 
+    return 0;
 }

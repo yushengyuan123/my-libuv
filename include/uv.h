@@ -1,7 +1,8 @@
-#include "stdint.h"
 
 #ifndef UV_H
 #define UV_H
+
+#include "stdint.h"
 
 struct uv__io_s;
 struct uv_loop_s;
@@ -19,18 +20,52 @@ typedef void (*uv__io_cb)(struct uv_loop_s* loop,
         struct uv__io_s* w,
                 unsigned int events);
 
-struct uv_handle_s {
-    void* data;
-    /* read-only */
-    uv_loop_t* loop;
-    /* private */
-    void* handle_queue[2];
-    union {
-        int fd;
-        void* reserved[4];
-    } u;
+typedef struct uv_timer_s uv_timer_t;
+typedef void (*uv_timer_cb)(uv_timer_t* handle);
+
+#define UV_HANDLE_PRIVATE_FIELDS                                              \
+    uv_handle_t* next_closing;                                                  \
     unsigned int flags;
+
+#define UV_HANDLE_FIELDS                                                      \
+    /* public */                                                                \
+    void* data;                                                                 \
+    /* read-only */                                                             \
+    uv_loop_t* loop;                                                            \
+    /* private */                                                               \
+    void* handle_queue[2];                                                      \
+    union {                                                                     \
+    int fd;                                                                   \
+    void* reserved[4];                                                        \
+    } u;                                                                        \
+    UV_HANDLE_PRIVATE_FIELDS                                                    \
+
+struct uv_timer_s {
+    UV_HANDLE_FIELDS
+    uv_timer_cb timer_cb;
+    long int timeout;
+    void* heap_node[3];
+    uint64_t start_id;
 };
+
+struct uv_handle_s {
+    UV_HANDLE_FIELDS
+};
+
+//struct uv_handle_s {
+//    void* data;
+//    /* read-only */
+//    uv_loop_t* loop;
+////    uv_handle_type type;
+//    /* private */
+//    void* handle_queue[2];
+//    union {
+//        int fd;
+//        void* reserved[4];
+//    } u;
+//    unsigned int flags;
+//    uv_handle_t* next_closing;
+//};
 
 struct uv_loop_s {
     void* data;
@@ -58,7 +93,8 @@ struct uv_loop_s {
     unsigned long flags;                                                        \
     int backend_fd;
     int async_wfd;
-    uint64_t time;
+    long int time;
+    uint64_t timer_counter;
     //    uv__io_t async_io_watcher;
     //    uv__io_t signal_io_watcher;
 };
@@ -79,7 +115,8 @@ typedef void (*uv__io_cb)(struct uv_loop_s* loop,
 #define uv__io_s uv__io_t;
 
 extern int uv_loop_init(uv_loop_t* loop);
-
 extern uv_loop_t* uv_loop_default();
+extern int uv_run(uv_loop_t *loop, uv_run_mode mode);
+extern int uv_timer_init(uv_loop_t*, uv_timer_t* handle);
 
 #endif

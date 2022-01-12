@@ -5,6 +5,8 @@ set(sourceDir ${CMAKE_SOURCE_DIR}/src)
 
 set(sourceFile ${sourceDir}/main.c
         ${sourceDir}/loop.c
-        src/uv-common.h)
+        ${sourceDir}/core.c
+        ${sourceDir}/timer.c
+       )
 
 add_executable(my-libuv ${sourceFile})

@@ -1,6 +1,8 @@
 #ifndef UV_SRC_HEAP_H_
 #define UV_SRC_HEAP_H_
 
+#include <stdio.h>
+
 struct heap_node {
     struct heap_node *left;
     struct heap_node *right;
@@ -18,6 +20,10 @@ struct heap {
 static void heap_init(struct heap* heap) {
     heap->min = NULL;
     heap->nelts = 0;
+}
+
+static struct heap_node* heap_min(const struct heap* heap) {
+    return heap->min;
 }
 
 static void heap_node_swap(struct heap* heap,
