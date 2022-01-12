@@ -3,4 +3,8 @@ project (my-libuv)
 
 set(sourceDir ${CMAKE_SOURCE_DIR}/src)
 
-add_executable(my-libuv ${sourceDir}/main.c)
+set(sourceFile ${sourceDir}/main.c
+        ${sourceDir}/loop.c
+        src/uv-common.h)
+
+add_executable(my-libuv ${sourceFile})

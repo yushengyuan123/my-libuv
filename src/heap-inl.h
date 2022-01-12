@@ -1,3 +1,6 @@
+#ifndef UV_SRC_HEAP_H_
+#define UV_SRC_HEAP_H_
+
 struct heap_node {
     struct heap_node *left;
     struct heap_node *right;
@@ -12,7 +15,7 @@ struct heap {
     unsigned int nelts;
 };
 
-void heap_init(struct heap* heap) {
+static void heap_init(struct heap* heap) {
     heap->min = NULL;
     heap->nelts = 0;
 }
@@ -51,7 +54,7 @@ static void heap_node_swap(struct heap* heap,
         child->parent->right = child;
 }
 
-void heap_insert(struct heap* heap, struct heap_node* newnode, heap_compare_fn less_than) {
+static void heap_insert(struct heap* heap, struct heap_node* newnode, heap_compare_fn less_than) {
     struct heap_node** parent;
     struct heap_node** child;
     unsigned int path;
@@ -93,7 +96,7 @@ void heap_insert(struct heap* heap, struct heap_node* newnode, heap_compare_fn l
         heap_node_swap(heap, newnode->parent, newnode);
 }
 
-void heap_remove(struct heap* heap,
+static void heap_remove(struct heap* heap,
         struct heap_node* node,
                 heap_compare_fn less_than) {
     struct heap_node* smallest;
@@ -181,3 +184,5 @@ void heap_remove(struct heap* heap,
     while (child->parent != NULL && less_than(child, child->parent))
         heap_node_swap(heap, child->parent, child);
 }
+
+#endif

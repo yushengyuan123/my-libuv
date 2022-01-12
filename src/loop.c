@@ -1,17 +1,45 @@
 #include <stdio.h>
-#include "uv.h"
+#include "../include/uv.h"
 #include "heap-inl.h"
+#include "queue.h"
+#include "internal.h"
 
-static uv_loop_t default_loop_pointer;
+static uv_loop_t default_loop_struct;
+static uv_loop_t *default_loop_pointer;
 
 int uv_loop_init(uv_loop_t *loop) {
-    heap_init((struct *) &loop->timer_heap);
+    heap_init((struct heap*) &loop->timer_heap);
+
+    QUEUE_INIT(&loop->wq);
+    QUEUE_INIT(&loop->idle_handles);
+    QUEUE_INIT(&loop->async_handles);
+    QUEUE_INIT(&loop->check_handles);
+    QUEUE_INIT(&loop->prepare_handles);
+    QUEUE_INIT(&loop->handle_queue);
+
+    loop->active_handles = 0;
+    loop->active_reqs.count = 0;
+    loop->nfds = 0;
+//    loop->watchers = NULL;
+    loop->nwatchers = 0;
+    QUEUE_INIT(&loop->pending_queue);
+    QUEUE_INIT(&loop->watcher_queue);
+
+//    uv__update_time(loop);
+    loop->async_wfd = -1;
+
+    return 0;
 }
 
-uv_loop_t uv_loop_default() {
+uv_loop_t* uv_loop_default() {
     if (default_loop_pointer != NULL) {
         return default_loop_pointer;
     }
-    return uv_loop_init(default_loop_pointer);
+
+    uv_loop_init(&default_loop_struct);
+
+    default_loop_pointer = &default_loop_struct;
+
+    return default_loop_pointer;
 }
 

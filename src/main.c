@@ -1,16 +1,13 @@
 #include "stdio.h"
 #include "heap-inl.h"
+#include "stdlib.h"
+#include "../include/uv.h"
+
+extern int num;
 
 
 int main() {
-    struct heap head;
-    struct heap_node node;
+   uv_loop_t *loop = uv_loop_default();
 
-    node.left = NULL;
-    node.right = NULL;
-    node.parent = NULL;
-
-    heap_init(&head);
-
-    printf("%d", head.nelts);
+   uv_loop_init(loop);
 }
