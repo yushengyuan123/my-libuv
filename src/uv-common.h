@@ -74,12 +74,39 @@ enum {
     UV_TIMER = 14
 };
 
+enum uv__work_kind {
+    UV__WORK_CPU,
+    UV__WORK_FAST_IO,
+    UV__WORK_SLOW_IO
+};
+
+# define UV__ERR(x) (-(x))
+
 #define uv__has_active_handles(loop) ((loop)->active_handles > 0)
 #define uv__handle_platform_init(h) ((h)->next_closing = NULL)
+
+# define UV_REQ_INIT(req, typ)                                                \
+    do {                                                                        \
+      (req)->type = (typ);                                                      \
+    }                                                                           \
+    while (0)
+
+#define uv__req_register(loop, req)                                           \
+    do {                                                                        \
+        (loop)->active_reqs.count++;                                              \
+    }                                                                           \
+    while (0)
+
 
 #define uv__active_handle_rm(h)                                               \
     do {                                                                        \
     (h)->loop->active_handles--;                                              \
+    }                                                                           \
+    while (0)
+
+#define uv__active_handle_add(h)                                              \
+    do {                                                                        \
+        (h)->loop->active_handles++;                                              \
     }                                                                           \
     while (0)
 
@@ -105,6 +132,14 @@ enum {
         (h)->next_closing = NULL;                                             \
     }                                                                           \
 while (0)
+
+#define uv__handle_start(h)                                                   \
+    do {                                                                        \
+        if (((h)->flags & UV_HANDLE_ACTIVE) != 0) break;                          \
+        (h)->flags |= UV_HANDLE_ACTIVE;                                           \
+        if (((h)->flags & UV_HANDLE_REF) != 0) uv__active_handle_add(h);          \
+        }                                                                           \
+    while (0)
 
 #define container_of(ptr, type, member) ((type *) ((char *) (ptr) - offsetof(type, member)))
 

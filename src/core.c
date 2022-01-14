@@ -26,7 +26,9 @@ int uv_run(uv_loop_t *loop, uv_run_mode mode) {
 
     while (r != 0 && count < 3) {
         uv__update_time(loop);
-        printf("nihao%ld\n", loop->time);
+
+        uv__run_timers(loop);
+
         count++;
     }
 

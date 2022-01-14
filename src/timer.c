@@ -4,14 +4,14 @@
 #include "stdint.h"
 #include "uv-common.h"
 
-static struct heap *timer_heap(const uv_loop_t* loop) {
-    return (struct heap*) &loop->timer_heap;
+static struct heap *timer_heap(const uv_loop_t *loop) {
+    return (struct heap *) &loop->timer_heap;
 }
 
-static int timer_less_than(const struct heap_node* ha,
-        const struct heap_node* hb) {
-    const uv_timer_t* a;
-    const uv_timer_t* b;
+static int timer_less_than(const struct heap_node *ha,
+                           const struct heap_node *hb) {
+    const uv_timer_t *a;
+    const uv_timer_t *b;
 
     a = container_of(ha, uv_timer_t, heap_node);
     b = container_of(hb, uv_timer_t, heap_node);
@@ -27,21 +27,21 @@ static int timer_less_than(const struct heap_node* ha,
     return a->start_id < b->start_id;
 }
 
-int uv_timer_init(uv_loop_t* loop, uv_timer_t* handle) {
-    uv__handle_init(loop, (uv_handle_t*) handle, UV_TIMER);
+int uv_timer_init(uv_loop_t *loop, uv_timer_t *handle) {
+    uv__handle_init(loop, (uv_handle_t *) handle, UV_TIMER);
     handle->timer_cb = NULL;
     handle->timeout = 0;
 //    handle->repeat = 0;
     return 0;
 }
 
-int uv_timer_stop(uv_timer_t* handle) {
-   if (!uv__is_active(handle))
-       return 0;
+int uv_timer_stop(uv_timer_t *handle) {
+    if (!uv__is_active(handle))
+        return 0;
 
     heap_remove(timer_heap(handle->loop),
-                (struct heap_node*) &handle->heap_node,
-                        timer_less_than);
+                (struct heap_node *) &handle->heap_node,
+                timer_less_than);
 
     uv__handle_stop(handle);
 
@@ -67,23 +67,25 @@ int uv_timer_start(uv_timer_t *handle,
 
     // 当我们这个timeout是负数的时候，if就会成立，就是超时的情况
     if (clamped_timeout < timeout) {
-        clamped_timeout = (uint64_t)-1;
+        clamped_timeout = (uint64_t) - 1;
     }
 
     handle->timer_cb = cb;
     handle->timeout = clamped_timeout;
-
     handle->start_id = handle->loop->timer_counter++;
 
-    heap_insert()
+    heap_insert(timer_heap(handle->loop), (struct heap_node *) &handle->heap_node,
+            timer_less_than);
+    // 设置 handle 的开始状态，就是设置handle结构体里面的一些东西
+    uv__handle_start(handle);
 
+    return 0;
 }
 
 
-
-void uv__run_timers(uv_loop_t * loop) {
+void uv__run_timers(uv_loop_t *loop) {
     struct heap_node *heap_node;
-    uv_timer_t * handle;
+    uv_timer_t *handle;
 
     for (;;) {
         heap_node = heap_min(timer_heap(loop));
@@ -93,12 +95,13 @@ void uv__run_timers(uv_loop_t * loop) {
 
         handle = container_of(heap_node, uv_timer_t, heap_node);
 
-        if (handle->timeout > loop -> time) {
+        if (handle->timeout > loop->time) {
             break;
         }
 
         uv_timer_stop(handle);
 
+        printf("aaa\n");
         handle->timer_cb(handle);
     }
 }
