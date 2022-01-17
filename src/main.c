@@ -3,24 +3,42 @@
 #include "stdlib.h"
 #include "time.h"
 #include "../include/uv.h"
+#include "sys/stat.h"
+#include "semaphore.h"
+#include "semaphore.h"
 
 int repeat = 0;
 int repeatCount = 3;
 
-static void callback(uv_timer_t *handle) {
-    repeat = repeat + 1;
-    printf("cur %d\n", repeat);
-    if (repeatCount == repeat) {
-        uv_timer_stop(handle);
-    }
+void callback() {
+    printf("文件操作回调函数");
 }
+
+struct Person {
+    int a;
+    void *wq[2];
+};
+
+
+void test(int *arr) {
+
+}
+
+typedef struct uv_semaphore_s {
+    uv_mutex_t mutex;
+    uv_cond_t cond;
+    unsigned int value;
+} uv_semaphore_t;
 
 int main() {
    uv_loop_t *loop = uv_loop_default();
    uv_timer_t handle;
+   uv_fs_t fs;
+   int res;
 
-   uv_timer_init(loop, &handle);
-   uv_timer_start(&handle, callback, -1, 0);
+   res = uv_fs_mkdir(loop, &fs, "./nihao",
+                     S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH, callback);
 
-   uv_run(loop, UV_RUN_DEFAULT);
+
+   printf("代码结束%d\n", res);
 }

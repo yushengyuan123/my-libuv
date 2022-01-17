@@ -3,12 +3,18 @@
 
 #include <stddef.h>
 
+// 这个队列的数据结构有一点和我们认知的不同，他是使用一个数组存放prev和next指针，其中下标0是next指针，1是prev指针
 typedef void *QUEUE[2];
 
 #define QUEUE_NEXT(q)       (*(QUEUE **) &((*(q))[0]))
 #define QUEUE_PREV(q)       (*(QUEUE **) &((*(q))[1]))
 #define QUEUE_PREV_NEXT(q)  (QUEUE_NEXT(QUEUE_PREV(q)))
 #define QUEUE_NEXT_PREV(q)  (QUEUE_PREV(QUEUE_NEXT(q)))
+
+/* Public macros. */
+#define QUEUE_DATA(ptr, type, field)                                          \
+    ((type *) ((char *) (ptr) - offsetof(type, field)))
+
 
 #define QUEUE_FOREACH(q, h)                                                   \
     for ((q) = QUEUE_NEXT(h); (q) != (h); (q) = QUEUE_NEXT(q))

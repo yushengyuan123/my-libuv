@@ -6,6 +6,7 @@
 #include "stdio.h"
 #include "unistd.h"
 #include <sys/types.h>
+#include <semaphore.h>
 
 struct uv__io_s;
 struct uv_loop_s;
@@ -13,6 +14,7 @@ struct uv_loop_s;
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_handle_s uv_handle_t;
 typedef struct uv_fs_s uv_fs_t;
+typedef struct uv_thread_options_s uv_thread_options_t;
 
 typedef enum {
     UV_RUN_DEFAULT = 0,
@@ -20,23 +22,28 @@ typedef enum {
     UV_RUN_NOWAIT
 } uv_run_mode;
 
-typedef enum {
-    UV_UNKNOWN_REQ = 0,
-    UV_REQ,
-    UV_CONNECT,
-    UV_WRITE,
-    UV_SHUTDOWN,
-    UV_UDP_SEND,
-    UV_FS,
-    UV_WORK,
-    UV_GETADDRINFO,
-    UV_GETNAMEINFO,
-    UV_REQ_TYPE_MAX,
-} uv_req_type;
+//typedef enum {
+//    UV_UNKNOWN_REQ = 0,
+//    UV_REQ,
+//    UV_CONNECT,
+//    UV_WRITE,
+//    UV_SHUTDOWN,
+//    UV_UDP_SEND,
+//    UV_FS,
+//    UV_WORK,
+//    UV_GETADDRINFO,
+//    UV_GETNAMEINFO,
+//    UV_REQ_TYPE_MAX,
+//} uv_req_type;
 
 enum {
     UV_EINVAL = 1
 };
+
+typedef enum {
+    UV_THREAD_NO_FLAGS = 0x00,
+    UV_THREAD_HAS_STACK_SIZE = 0x01
+} uv_thread_create_flags;
 
 typedef enum {
     UV_FS_UNKNOWN = -1,
@@ -88,6 +95,14 @@ typedef void (*uv_timer_cb)(uv_timer_t* handle);
 typedef void (*uv_fs_cb)(uv_fs_t* req);
 
 // unix
+#define UV_ONCE_INIT PTHREAD_ONCE_INIT
+
+#ifndef UV_PLATFORM_SEM_T
+// 信号量的数据类型为结构sem_t，它本质上是一个长整型的数
+# define UV_PLATFORM_SEM_T sem_t
+#endif
+
+
 typedef int uv_file;
 typedef struct uv_buf_t {
     char* base;
@@ -95,7 +110,15 @@ typedef struct uv_buf_t {
 } uv_buf_t;
 typedef gid_t uv_gid_t;
 typedef uid_t uv_uid_t;
-#define UV_ONCE_INIT PTHREAD_ONCE_INIT
+typedef pthread_once_t uv_once_t;
+typedef pthread_t uv_thread_t;
+typedef pthread_mutex_t uv_mutex_t;
+typedef pthread_rwlock_t uv_rwlock_t;
+typedef UV_PLATFORM_SEM_T uv_sem_t;
+typedef pthread_cond_t uv_cond_t;
+typedef pthread_key_t uv_key_t;
+
+
 
 // threadpool
 struct uv__work {
@@ -105,6 +128,10 @@ struct uv__work {
     void* wq[2];
 };
 
+typedef struct {
+    long tv_sec;
+    long tv_nsec;
+} uv_timespec_t;
 
 typedef struct {
     uint64_t st_dev;
@@ -124,6 +151,29 @@ typedef struct {
     uv_timespec_t st_ctim;
     uv_timespec_t st_birthtim;
 } uv_stat_t;
+
+#define UV_REQ_TYPE_MAP(XX)                                                   \
+    XX(REQ, req)                                                                \
+    XX(CONNECT, connect)                                                        \
+    XX(WRITE, write)                                                            \
+    XX(SHUTDOWN, shutdown)                                                      \
+    XX(UDP_SEND, udp_send)                                                      \
+    XX(FS, fs)                                                                  \
+    XX(WORK, work)                                                              \
+    XX(GETADDRINFO, getaddrinfo)                                                \
+    XX(GETNAMEINFO, getnameinfo)                                                \
+    XX(RANDOM, random)                                                          \
+
+#define UV_REQ_TYPE_PRIVATE /* empty */
+
+typedef enum {
+    UV_UNKNOWN_REQ = 0,
+#define XX(uc, lc) UV_##uc,
+    UV_REQ_TYPE_MAP(XX)
+#undef XX
+    UV_REQ_TYPE_PRIVATE
+    UV_REQ_TYPE_MAX
+} uv_req_type;
 
 #define UV_HANDLE_PRIVATE_FIELDS                                              \
     uv_handle_t* next_closing;                                                  \
@@ -146,7 +196,9 @@ typedef struct {
 
 #define UV_REQ_FIELDS                                                         \
     /* public */                                                                \
-    void* data;                                                                 \
+    void* data;                                                               \
+    /* read-only */                                                             \
+    uv_req_type type;                                                           \
     /* private */                                                               \
     void* reserved[6];                                                          \
     UV_REQ_PRIVATE_FIELDS                                                     \
@@ -183,6 +235,7 @@ struct uv_fs_s {
     uv_fs_type fs_type;
     uv_loop_t *loop;
     uv_fs_cb cb;
+    ssize_t result;
     void *ptr;
     const char *path;
     uv_stat_t statbuf;
@@ -225,15 +278,22 @@ struct uv_loop_s {
     void* watcher_queue[2];
     uv_handle_t* closing_handles;
     //    uv__io_t** watchers;
-    unsigned int nwatchers;                                                     \
+    unsigned int nwatchers;
     unsigned int nfds;
-    unsigned long flags;                                                        \
+    unsigned long flags;
     int backend_fd;
     int async_wfd;
     long int time;
     uint64_t timer_counter;
+    uv_mutex_t wq_mutex;
     //    uv__io_t async_io_watcher;
     //    uv__io_t signal_io_watcher;
+};
+
+struct uv_thread_options_s {
+    unsigned int flags;
+    size_t stack_size;
+    /* More fields may be added at any time. */
 };
 
 struct uv__io_s {
@@ -249,6 +309,11 @@ typedef void (*uv__io_cb)(struct uv_loop_s* loop,
         struct uv__io_s* w,
                 unsigned int events);
 
+typedef void* (*uv_malloc_func)(size_t size);
+typedef void* (*uv_realloc_func)(void* ptr, size_t size);
+typedef void* (*uv_calloc_func)(size_t count, size_t size);
+typedef void (*uv_free_func)(void* ptr);
+
 #define uv__io_s uv__io_t;
 
 extern int uv_loop_init(uv_loop_t* loop);
@@ -261,9 +326,30 @@ extern int uv_timer_start(uv_timer_t *handle,
                           uint64_t repeat);
 extern int uv_timer_stop(uv_timer_t *handle);
 extern void uv__run_timers(uv_loop_t *loop);
+
 extern int uv_cond_init(uv_cond_t* cond);
 extern void uv_cond_destroy(uv_cond_t* cond);
 extern void uv_cond_signal(uv_cond_t* cond);
 extern void uv_cond_broadcast(uv_cond_t* cond);
+extern void uv_cond_wait(uv_cond_t* cond, uv_mutex_t* mutex);
+
+extern int uv_sem_init(uv_sem_t* sem, unsigned int value);
+extern void uv_sem_destroy(uv_sem_t* sem);
+extern void uv_sem_wait(uv_sem_t* sem);
+extern void uv_sem_post(uv_sem_t* sem);
+
+extern int uv_mutex_init(uv_mutex_t* mutex);
+extern void uv_mutex_lock(uv_mutex_t* mutex);
+extern void uv_mutex_unlock(uv_mutex_t* mutex) ;
+
+// thread
+extern void uv_once(uv_once_t* guard, void (*callback)(void));
+typedef void (*uv_thread_cb)(void* arg);
+extern int uv_thread_create(uv_thread_t* tid, uv_thread_cb entry, void* arg);
+
+
+// fs
+extern int uv_fs_mkdir(uv_loop_t *loop,uv_fs_t *req, const char *path, int mode, uv_fs_cb cb);
+
 
 #endif

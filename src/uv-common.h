@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 #include "queue.h"
+#include "../include/uv.h"
 
 enum {
     /* Used by all handles. */
@@ -83,6 +84,20 @@ enum uv__work_kind {
 # define UV__ERR(x) (-(x))
 
 #define uv__has_active_handles(loop) ((loop)->active_handles > 0)
+
+#define uv__req_register(loop, req)                                           \
+    do {                                                                        \
+        (loop)->active_reqs.count++;                                              \
+    }                                                                           \
+    while (0)
+
+#define uv__req_unregister(loop, req)                                         \
+    do {                                                                        \
+        assert(uv__has_active_reqs(loop));                                        \
+        (loop)->active_reqs.count--;                                              \
+    }                                                                           \
+    while (0)
+
 #define uv__handle_platform_init(h) ((h)->next_closing = NULL)
 
 # define UV_REQ_INIT(req, typ)                                                \
@@ -148,3 +163,13 @@ while (0)
 #define uv__has_active_reqs(loop) ((loop)->active_reqs.count > 0)
 
 #endif //MY_LIBUV_UV_COMMON_H
+
+void uv__work_submit(uv_loop_t* loop,
+                     struct uv__work *w,
+                     enum uv__work_kind kind,
+                     void (*work)(struct uv__work *w),
+                     void (*done)(struct uv__work *w, int status));
+
+extern void* uv__malloc(size_t size);
+extern void uv__free(void* ptr);
+extern char *uv__strdup(const char* s);
