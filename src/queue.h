@@ -40,7 +40,7 @@ typedef void *QUEUE[2];
         QUEUE_PREV_NEXT(h) = (h);                                                 \
     }                                                                           \
     while (0)
-
+// 把一个h队列，在节点q处剪开，原来的q处位置头节点变为n
 #define QUEUE_SPLIT(h, q, n)                                                  \
     do {                                                                        \
         QUEUE_PREV(n) = QUEUE_PREV(h);                                            \
@@ -51,14 +51,14 @@ typedef void *QUEUE[2];
         QUEUE_PREV(q) = (n);                                                      \
     }                                                                           \
     while (0)
-
+// 拿到头节点，然后把头节点在h队列剪开，新的头节点变为n
 #define QUEUE_MOVE(h, n)                                                      \
     do {                                                                        \
         if (QUEUE_EMPTY(h))                                                       \
-        QUEUE_INIT(n);                                                          \
-        else {                                                                    \
-        QUEUE* q = QUEUE_HEAD(h);                                               \
-        QUEUE_SPLIT(h, q, n);                                                   \
+	        QUEUE_INIT(n);                                                          \
+	    else {                                                                    \
+	        QUEUE* q = QUEUE_HEAD(h);                                               \
+	        QUEUE_SPLIT(h, q, n);                                                   \
         }                                                                         \
     }                                                                           \
     while (0)

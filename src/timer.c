@@ -3,6 +3,7 @@
 #include "stdio.h"
 #include "stdint.h"
 #include "uv-common.h"
+#include "limits.h"
 
 static struct heap *timer_heap(const uv_loop_t *loop) {
     return (struct heap *) &loop->timer_heap;
@@ -101,7 +102,32 @@ void uv__run_timers(uv_loop_t *loop) {
 
         uv_timer_stop(handle);
 
-        printf("aaa\n");
         handle->timer_cb(handle);
     }
+}
+
+int uv__next_timeout(const uv_loop_t* loop) {
+	const struct heap_node* heap_node;
+	const uv_timer_t* handle;
+	uint64_t diff;
+
+	heap_node = heap_min(timer_heap(loop));
+	// 如果没有 timer 待处理，则可以放心的 block 住，等待事件到达
+	if (heap_node == NULL) {
+		return -1; /* block indefinitely */
+	}
+	
+	handle = container_of(heap_node, uv_timer_t, heap_node);
+	// 有 timer，且 timer 已经到了要被执行的时间内，则需让 `uv__io_poll`
+	// 尽快返回，以在下一个事件循环迭代内处理超时的 timer
+	if (handle->timeout <= loop->time)
+		return 0;
+	// 没有 timer 超时，用最小超时间减去、当前的循环时间的差值，作为超时时间
+	// 因为在为了这个差值时间内是没有 timer 超时的，所以可以放心 block 以等待
+	// epoll 事件
+	diff = handle->timeout - loop->time;
+	if (diff > INT_MAX)
+		diff = INT_MAX;
+
+	return (int) diff;
 }

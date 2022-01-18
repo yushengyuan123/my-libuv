@@ -8,13 +8,23 @@
 #include <sys/types.h>
 #include <semaphore.h>
 
-struct uv__io_s;
+typedef struct uv__io_s uv__io_t;
 struct uv_loop_s;
 
 typedef struct uv_loop_s uv_loop_t;
 typedef struct uv_handle_s uv_handle_t;
 typedef struct uv_fs_s uv_fs_t;
 typedef struct uv_thread_options_s uv_thread_options_t;
+typedef struct uv_idle_s uv_idle_t;
+typedef struct uv_poll_s uv_poll_t;
+typedef struct uv_check_s uv_check_t;
+typedef struct uv_async_s uv_async_t;
+typedef struct uv_prepare_s uv_prepare_t;
+
+#ifndef UV_IO_PRIVATE_PLATFORM_FIELDS
+# define UV_IO_PRIVATE_PLATFORM_FIELDS /* empty */
+#endif
+
 
 typedef enum {
     UV_RUN_DEFAULT = 0,
@@ -93,6 +103,16 @@ typedef void (*uv__io_cb)(struct uv_loop_s* loop,
 typedef struct uv_timer_s uv_timer_t;
 typedef void (*uv_timer_cb)(uv_timer_t* handle);
 typedef void (*uv_fs_cb)(uv_fs_t* req);
+typedef void (*uv_prepare_cb)(uv_prepare_t* handle);
+typedef void (*uv_idle_cb)(uv_idle_t* handle);
+typedef void (*uv_check_cb)(uv_check_t* handle);
+typedef void (*uv_poll_cb)(uv_poll_t* handle, int status, int events);
+typedef void (*uv_async_cb)(uv_async_t* handle);
+
+#define UV_ASYNC_PRIVATE_FIELDS                                               \
+	uv_async_cb async_cb;                                                       \
+	void* queue[2];                                                             \
+	int pending;                                                                \
 
 // unix
 #define UV_ONCE_INIT PTHREAD_ONCE_INIT
@@ -117,6 +137,33 @@ typedef pthread_rwlock_t uv_rwlock_t;
 typedef UV_PLATFORM_SEM_T uv_sem_t;
 typedef pthread_cond_t uv_cond_t;
 typedef pthread_key_t uv_key_t;
+
+#define UV_POLL_PRIVATE_FIELDS                                                \
+	uv__io_t io_watcher;
+
+#define UV_PREPARE_PRIVATE_FIELDS                                             \
+	uv_prepare_cb prepare_cb;                                                   \
+	void* queue[2];                                                             \
+
+#define UV_CHECK_PRIVATE_FIELDS                                               \
+	uv_check_cb check_cb;                                                       \
+	void* queue[2];
+
+#define UV_IDLE_PRIVATE_FIELDS                                                \
+	uv_idle_cb idle_cb;                                                         \
+	void* queue[2];                                                             \
+
+
+
+struct uv__io_s {
+    uv__io_cb cb;
+    void* pending_queue[2];
+    void* watcher_queue[2];
+    unsigned int pevents; /* Pending event mask i.e. mask at next tick. */
+    unsigned int events;  /* Current event mask. */
+    int fd;
+    UV_IO_PRIVATE_PLATFORM_FIELDS
+};
 
 
 
@@ -192,6 +239,12 @@ typedef enum {
     } u;                                                                        \
     UV_HANDLE_PRIVATE_FIELDS                                                  \
 
+
+struct uv_async_s {
+	UV_HANDLE_FIELDS
+	UV_ASYNC_PRIVATE_FIELDS
+};
+
 #define UV_REQ_PRIVATE_FIELDS  /* empty */
 
 #define UV_REQ_FIELDS                                                         \
@@ -242,6 +295,23 @@ struct uv_fs_s {
     UV_FS_PRIVATE_FIELDS
 };
 
+
+struct uv_check_s {
+	UV_HANDLE_FIELDS
+	UV_CHECK_PRIVATE_FIELDS
+};
+
+struct uv_poll_s {
+	UV_HANDLE_FIELDS
+	uv_poll_cb poll_cb;
+	UV_POLL_PRIVATE_FIELDS
+};
+
+struct uv_idle_s {
+	UV_HANDLE_FIELDS
+	UV_IDLE_PRIVATE_FIELDS
+};
+
 //struct uv_handle_s {
 //    void* data;
 //    /* read-only */
@@ -281,12 +351,15 @@ struct uv_loop_s {
     unsigned int nwatchers;
     unsigned int nfds;
     unsigned long flags;
+    unsigned int stop_flag;
     int backend_fd;
     int async_wfd;
     long int time;
     uint64_t timer_counter;
     uv_mutex_t wq_mutex;
-    //    uv__io_t async_io_watcher;
+    uv_async_t wq_async;
+    uv__io_t async_io_watcher;
+    uv__io_t** watchers;
     //    uv__io_t signal_io_watcher;
 };
 
@@ -296,13 +369,9 @@ struct uv_thread_options_s {
     /* More fields may be added at any time. */
 };
 
-struct uv__io_s {
-    uv__io_cb cb;
-    void* pending_queue[2];
-    void* watcher_queue[2];
-    unsigned int pevents; /* Pending event mask i.e. mask at next tick. */
-    unsigned int events;  /* Current event mask. */
-    int fd;
+struct uv_prepare_s {
+	UV_HANDLE_FIELDS
+	UV_PREPARE_PRIVATE_FIELDS
 };
 
 typedef void (*uv__io_cb)(struct uv_loop_s* loop,
@@ -314,7 +383,6 @@ typedef void* (*uv_realloc_func)(void* ptr, size_t size);
 typedef void* (*uv_calloc_func)(size_t count, size_t size);
 typedef void (*uv_free_func)(void* ptr);
 
-#define uv__io_s uv__io_t;
 
 extern int uv_loop_init(uv_loop_t* loop);
 extern uv_loop_t* uv_loop_default();
@@ -347,6 +415,9 @@ extern void uv_once(uv_once_t* guard, void (*callback)(void));
 typedef void (*uv_thread_cb)(void* arg);
 extern int uv_thread_create(uv_thread_t* tid, uv_thread_cb entry, void* arg);
 
+//async
+extern int uv_async_send(uv_async_t* async);
+extern int uv_async_init(uv_loop_t* loop, uv_async_t* handle, uv_async_cb async_cb);
 
 // fs
 extern int uv_fs_mkdir(uv_loop_t *loop,uv_fs_t *req, const char *path, int mode, uv_fs_cb cb);

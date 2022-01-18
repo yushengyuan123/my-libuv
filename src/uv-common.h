@@ -148,6 +148,8 @@ enum uv__work_kind {
     }                                                                           \
 while (0)
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
 #define uv__handle_start(h)                                                   \
     do {                                                                        \
         if (((h)->flags & UV_HANDLE_ACTIVE) != 0) break;                          \
@@ -169,6 +171,9 @@ void uv__work_submit(uv_loop_t* loop,
                      enum uv__work_kind kind,
                      void (*work)(struct uv__work *w),
                      void (*done)(struct uv__work *w, int status));
+int uv__next_timeout(const uv_loop_t* loop);
+void uv__work_done(uv_async_t* handle);
+void uv__work_done(uv_async_t* handle);
 
 extern void* uv__malloc(size_t size);
 extern void uv__free(void* ptr);

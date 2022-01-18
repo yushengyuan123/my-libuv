@@ -3,6 +3,7 @@
 #include "stdlib.h"
 #include "time.h"
 #include "../include/uv.h"
+#include "internal.h"
 #include "sys/stat.h"
 #include "semaphore.h"
 #include "semaphore.h"
@@ -23,12 +24,12 @@ struct Person {
 void test(int *arr) {
 
 }
-
-typedef struct uv_semaphore_s {
-    uv_mutex_t mutex;
-    uv_cond_t cond;
-    unsigned int value;
-} uv_semaphore_t;
+//
+//typedef struct uv_semaphore_s {
+//    uv_mutex_t mutex;
+//    uv_cond_t cond;
+//    unsigned int value;
+//} uv_semaphore_t;
 
 int main() {
    uv_loop_t *loop = uv_loop_default();
@@ -41,4 +42,5 @@ int main() {
 
 
    printf("代码结束%d\n", res);
+
 }

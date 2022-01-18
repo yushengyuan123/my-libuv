@@ -10,6 +10,7 @@ set(sourceFile ${sourceDir}/main.c
         ${sourceDir}/thread.c
         ${sourceDir}/common.c
         ${sourceDir}/threadpool.c
-        ${sourceDir}/unix/fs.c)
+        ${sourceDir}/unix/fs.c
+        ${sourceDir}/unix/loop-watcher.c src/unix/async.c)
 
 add_executable(my-libuv ${sourceFile})

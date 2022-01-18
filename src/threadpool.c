@@ -112,8 +112,8 @@ static void worker(void* arg) {
                         executing. */
         // 这里我猜想就是把任务里面的东西，放入到这个loop的结构题里面，方便后续主线程的调用
         QUEUE_INSERT_TAIL(&w->loop->wq, &w->wq);
-        // 唤醒主线程的事件循环
-//        uv_async_send(&w->loop->wq_async);
+        // 唤醒主线程的事件循环, 这个wq_async在async_init中进行过了初始化
+        uv_async_send(&w->loop->wq_async);
         uv_mutex_unlock(&w->loop->wq_mutex);
 
         /* Lock `mutex` since that is expected at the start of the next
@@ -239,4 +239,34 @@ void uv__work_submit(uv_loop_t *loop,
     // w->wq == void* wq[2] &w->wq含义就是拿出第一个元素
     // post函数的作用就是上传任务的
     post(&w->wq, kind);
+}
+
+void uv__work_done(uv_async_t* handle) {
+	struct uv__work* w;
+	uv_loop_t* loop;
+	QUEUE* q;
+	QUEUE wq;
+	int err;
+
+	loop = container_of(handle, uv_loop_t, wq_async);
+	uv_mutex_lock(&loop->wq_mutex);
+	// 将目前的 `loop->wq` 全部移动到局部变量 `wq` 中，
+	//
+	// `loop->wq` 中的内容是在上文 worker 中任务完成后使用
+	// `QUEUE_INSERT_TAIL(&w->loop->wq, &w->wq)` 添加的
+	//
+	// 这样尽快释放锁，让其他任务可尽快接入
+	// 有一个问题，为什么这里会有锁？和线程相关吗
+	QUEUE_MOVE(&loop->wq, &wq);
+	uv_mutex_unlock(&loop->wq_mutex);
+	// 遍历 `wq` 执行其中每个任务的完成回调
+	while (!QUEUE_EMPTY(&wq)) {
+		q = QUEUE_HEAD(&wq);
+		QUEUE_REMOVE(q);
+
+		w = container_of(q, struct uv__work, wq);
+//		err = (w->work == uv__cancelled) ? UV_ECANCELED : 0;
+		err = 0;
+		w->done(w, err);
+	}
 }
