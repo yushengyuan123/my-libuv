@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include "limits.h"
 #include "sys/sem.h"
-#include "sys/semaphore.h"
+#include <pthread.h>
 #include "errno.h"
 
 #define platform_needs_custom_semaphore 1

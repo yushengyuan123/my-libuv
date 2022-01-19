@@ -24,7 +24,7 @@ int uv_loop_init(uv_loop_t *loop) {
     // todo 这里初始化是0，为了测试改成了1，记得改回来
     loop->active_reqs.count = 1;
     loop->nfds = 0;
-//    loop->watchers = NULL;
+    loop->watchers = NULL;
     loop->nwatchers = 0;
     loop->timer_counter = 0;
     QUEUE_INIT(&loop->pending_queue);
@@ -51,6 +51,9 @@ int uv_loop_init(uv_loop_t *loop) {
     // 中的watcher_queue队列，一个一个元素提取出来
     err = uv_async_init(loop, &loop->wq_async, uv__work_done);
 
+    
+    uv__free(loop->watchers);
+    loop->nwatchers = 0;
     return 0;
 }
 

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "stdlib.h"
 #include "../include/uv.h"
 #include "internal.h"
 #include "uv-common.h"
@@ -70,13 +71,64 @@ int uv_backend_timeout(const uv_loop_t* loop) {
 	return uv__next_timeout(loop);
 }
 
+static unsigned int next_power_of_two(unsigned int val) {
+	val -= 1;
+	val |= val >> 1;
+	val |= val >> 2;
+	val |= val >> 4;
+	val |= val >> 8;
+	val |= val >> 16;
+	val += 1;
+	return val;
+}
+
+// 入参 (loop, w->fd + 1)
+static void maybe_resize(uv_loop_t* loop, unsigned int len) {
+	uv__io_t** watchers;
+	void* fake_watcher_list;
+	void* fake_watcher_count;
+	unsigned int nwatchers;
+	unsigned int i;
+
+	// 此时fd + 1 = 1；nwatchers = 0；
+	if (len <= loop->nwatchers)
+		return;
+
+	/* Preserve fake watcher list and count at the end of the watchers */
+	// 到这里的时候loop->watchers只经过了初始化为null
+	if (loop->watchers != NULL) {
+		fake_watcher_list = loop->watchers[loop->nwatchers];
+		fake_watcher_count = loop->watchers[loop->nwatchers + 1];
+	} else {
+		fake_watcher_list = NULL;
+		fake_watcher_count = NULL;
+	}
+	// len + 2 = 3
+	nwatchers = next_power_of_two(len + 2) - 2;
+	// 给这个watchers分配空间
+	watchers = uv__reallocf(loop->watchers,
+							(nwatchers + 2) * sizeof(loop->watchers[0]));
+
+	if (watchers == NULL)
+		abort();
+	for (i = loop->nwatchers; i < nwatchers; i++)
+		watchers[i] = NULL;
+	watchers[nwatchers] = fake_watcher_list;
+	watchers[nwatchers + 1] = fake_watcher_count;
+
+	loop->watchers = watchers;
+	loop->nwatchers = nwatchers;
+}
+
 // async start传入参数(&loop->async_io_watcher, uv__async_io, pipefd[0])
 // pipefd[0]在linux平台上是经过了虚拟的能插入epoll的fd，uv__async_io是一个async的回调函数不是用户的
 void uv__io_init(uv__io_t* w, uv__io_cb cb, int fd) {
 	assert(cb != NULL);
 	assert(fd >= -1);
+	
 	QUEUE_INIT(&w->pending_queue);
 	QUEUE_INIT(&w->watcher_queue);
+	
 	w->cb = cb;
 	w->fd = fd;
 	w->events = 0;
@@ -90,14 +142,9 @@ void uv__io_init(uv__io_t* w, uv__io_cb cb, int fd) {
 
 // 入参(loop, &loop->async_io_watcher, POLLIN)
 void uv__io_start(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
-	assert(0 == (events & ~(POLLIN | POLLOUT | UV__POLLRDHUP | UV__POLLPRI)));
-	assert(0 != events);
-	assert(w->fd >= 0);
-	assert(w->fd < INT_MAX);
-
 	w->pevents |= events;
-//	maybe_resize(loop, w->fd + 1);
-
+	// 这段代码应该是有作用的，我尝试删掉了这段代码总有访问错误
+	maybe_resize(loop, w->fd + 1);
 #if !defined(__sun)
 	/* The event ports backend needs to rearm all file descriptors on each and
 	 * every tick of the event loop but the other backends allow us to
@@ -114,6 +161,7 @@ void uv__io_start(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
 		// 在io run中loop->watcher_queue会从这个数据结构中提取观察者执行，所以我们
 		// 要把它加入到观察者队列中
 		QUEUE_INSERT_TAIL(&loop->watcher_queue, &w->watcher_queue);
+	
 	// 将 fd 和对应的任务关联的操作，同样可以翻看上面的 `uv__io_poll`，当接收到事件
 	// 通知后，会有从 `loop->watchers` 中根据 fd 取出任务并执行其完成回调的动作
 	// 另外，根据 fd 确保 watcher 不会被重复添加
@@ -135,8 +183,7 @@ int uv_run(uv_loop_t *loop, uv_run_mode mode) {
     }
 
     printf("%ld\n", loop->time);
-
-    int count = 0;
+    
 
     while (r != 0 && loop->stop_flag == 0) {
         uv__update_time(loop);
@@ -163,11 +210,6 @@ int uv_run(uv_loop_t *loop, uv_run_mode mode) {
 	    }
 	
 	    uv__io_poll(loop, timeout);
-	    
-	    
-     
-     
-     
     }
 
     return 0;

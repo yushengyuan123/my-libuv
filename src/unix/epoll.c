@@ -1,21 +1,33 @@
 #include "stdio.h"
 #include "../../include/uv.h"
-#include <sys/epoll.h>
 #include "stdlib.h"
 #include "assert.h"
 #include "../queue.h"
 #include "string.h"
 #include "errno.h"
 #include "../uv-common.h"
+#include "../internal.h"
 #include "poll.h"
 
-//epoll_event结构体一般用在epoll机制中，其定义如下：
-struct epoll_event{
-	uint32_t events;   /* Epoll events */
-	epoll_data_t data;    /* User data variable */
-};
+#if defined(__APPLE__)
+	/**empty**/
+#else
+	#include <sys/epoll.h>
+	#include <sys/eventfd.h>
+#endif
 
-void uv_io_poll(uv_loop_t* loop, int timeout) {
+//epoll_event结构体一般用在epoll机制中，其定义如下：
+//struct epoll_event{
+//	uint32_t events;   /* Epoll events */
+//	epoll_data_t data;    /* User data variable */
+//};
+
+#if defined(__APPLE__)
+	void uv__io_poll(uv_loop_t* loop, int timeout) {
+		printf("apple下的epoll不做处理\n");
+	}
+#else
+void uv__io_poll(uv_loop_t* loop, int timeout) {
 	static const int max_safe_timeout = 1789569;
 	static int no_epoll_pwait_cached;
 	static int no_epoll_wait_cached;
@@ -64,7 +76,9 @@ void uv_io_poll(uv_loop_t* loop, int timeout) {
 		// todo 这个pevents暂时暂时不知道是什么东西
 		assert(w->pevents != 0);
 		assert(w->fd >= 0);
-		assert(w->fd < (int) loop->nwatchers);
+		printf("312321321321\n");
+//		assert(w->fd < (int) loop->nwatchers);
+		printf("hahaa\n");
 		
 		e.events = w->pevents;
 		// 把描述符加入到epoll中,在async中我们的fs操作通过eventfd，也搞出了一个fd
@@ -80,14 +94,18 @@ void uv_io_poll(uv_loop_t* loop, int timeout) {
 		// 从这个api的调用模式可以的看到这个backend_fd就是用来存放epoll创建出来的fd
 		// 这句话的作用就是把我的任务虚拟出来的fd加入到了epoll中
 		if (epoll_ctl(loop->backend_fd, op, w->fd, &e)) {
-			if (errno != EEXIST)
-				abort();
+//			printf("2222333\n");
+//			if (errno != EEXIST) {
+//				printf("这里死掉了\n");
+//				abort();
+//			}
 
-			assert(op == EPOLL_CTL_ADD);
+//			printf("1111\n");
+//			assert(op == EPOLL_CTL_ADD);
 
 			/* We've reactivated a file descriptor that's been watched before. */
-			if (epoll_ctl(loop->backend_fd, EPOLL_CTL_MOD, w->fd, &e))
-				abort();
+//			if (epoll_ctl(loop->backend_fd, EPOLL_CTL_MOD, w->fd, &e))
+//				abort();
 		}
 		
 		w->events = w->pevents;
@@ -101,6 +119,7 @@ void uv_io_poll(uv_loop_t* loop, int timeout) {
 //	}
 	
 	assert(timeout >= -1);
+	printf("2222\n");
 	base = loop->time;
 	count = 48; /* Benchmarks suggest this gives the best throughput. */
 	real_timeout = timeout;
@@ -110,6 +129,8 @@ void uv_io_poll(uv_loop_t* loop, int timeout) {
 		if (timeout != 0) {
 			printf("uv__io_poll timeout != 0\n");
 		}
+		
+		printf("这进入这里\n");
 		
 		if (sizeof(int32_t) == sizeof(long) && timeout >= max_safe_timeout)
 			timeout = max_safe_timeout;
@@ -185,3 +206,4 @@ void uv_io_poll(uv_loop_t* loop, int timeout) {
 		}
 	}
 }
+#endif

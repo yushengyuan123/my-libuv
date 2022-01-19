@@ -5,14 +5,12 @@
 #include "../include/uv.h"
 #include "internal.h"
 #include "sys/stat.h"
-#include "semaphore.h"
-#include "semaphore.h"
 
 int repeat = 0;
 int repeatCount = 3;
 
 void callback() {
-    printf("文件操作回调函数");
+    printf("文件操作回调函数\n");
 }
 
 struct Person {
@@ -40,7 +38,6 @@ int main() {
    res = uv_fs_mkdir(loop, &fs, "./nihao",
                      S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH, callback);
 
-
+   uv_run(loop, UV_RUN_DEFAULT);
    printf("代码结束%d\n", res);
-
 }

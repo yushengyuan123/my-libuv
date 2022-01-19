@@ -178,3 +178,5 @@ void uv__work_done(uv_async_t* handle);
 extern void* uv__malloc(size_t size);
 extern void uv__free(void* ptr);
 extern char *uv__strdup(const char* s);
+void* uv__reallocf(void* ptr, size_t size);
+void* uv__realloc(void* ptr, size_t size);

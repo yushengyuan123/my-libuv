@@ -6,10 +6,16 @@
 #include "../internal.h"
 #include "unistd.h"
 #include "errno.h"
-#include "sys/epoll.h"
 #include "../uv-common.h"
 #include "assert.h"
 #include "poll.h"
+
+#if defined(__APPLE__)
+	/**empty**/
+#else
+	#include <sys/epoll.h>
+	#include <sys/eventfd.h>
+#endif
 
 static void uv__async_io(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
 	char buf[1024];
@@ -47,8 +53,8 @@ static void uv__async_io(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
 		QUEUE_REMOVE(q);
 		QUEUE_INSERT_TAIL(&loop->async_handles, q);
 
-		if (0 == uv__async_spin(h))
-			continue;  /* Not pending. */
+//		if (0 == uv__async_spin(h))
+//			continue;  /* Not pending. */
 			
 		if (h->async_cb == NULL)
 			continue;
@@ -60,6 +66,7 @@ static void uv__async_io(uv_loop_t* loop, uv__io_t* w, unsigned int events) {
 }
 
 static int uv__async_start(uv_loop_t* loop) {
+	printf("进入额async start\n");
 	int pipefd[2];
 	int err;
 
@@ -95,6 +102,7 @@ static int uv__async_start(uv_loop_t* loop) {
 // async_cb这是一个回调函数
 // 入参(loop, &loop->wq_async, uv__work_done)
 int uv_async_init(uv_loop_t* loop, uv_async_t* handle, uv_async_cb async_cb) {
+	printf("进入init\n");
 	int err;
 	// 在win平台中是没有这句话的
 	err = uv__async_start(loop);

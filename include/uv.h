@@ -360,7 +360,7 @@ struct uv_loop_s {
     uv_async_t wq_async;
     uv__io_t async_io_watcher;
     uv__io_t** watchers;
-    //    uv__io_t signal_io_watcher;
+    uv__io_t signal_io_watcher;
 };
 
 struct uv_thread_options_s {
